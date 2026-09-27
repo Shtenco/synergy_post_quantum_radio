@@ -84,3 +84,24 @@ cargo run --bin synergy-pq-radio-demo
 PROTOTYPE / RESEARCH.
 
 Код не проходил независимый криптографический аудит. Его нельзя считать production/safety-critical/military/emergency готовым без отдельного review, hardware key custody и испытаний конкретного radio/QPU backend.
+## R2: восстановление исторической криптографии
+
+R2 forensic recovery завершил восстановление оригинального `SYNERGY_ORCH/l1/hash16d.py` из исходного пользовательского пакета `files (6).zip -> SYNERGY_ORCH.zip`.
+
+- recovered source SHA-256: `f0e57cd160d537e06abecb665b10ad37cd38c8919a1d2f1e336d8f661c80a3a6`;
+- размер: 9 611 байт;
+- persona исходника: `SINERGY_16D_v3`;
+- исходник сохранён в `legacy/recovered/SYNERGY_ORCH/l1/hash16d.py`;
+- добавлены fast/full KAT vectors и `tests/hash16d_kat.py`.
+
+Криптоанализ показал, что Hash16D - экспериментальный 256-битный hash-combiner. Он не является KEM, подписью или ratchet и не даёт обоснования старому security claim `2^4096`. Несколько legacy-ветвей носят названия Ring-LWE, isogeny, SPHINCS+, NTRU и Pedersen, но код не является стандартными реализациями этих конструкций.
+
+Отдельно проверены исторические пакеты `files.zip` и `files (1)..(7).zip`: криптографической реализации на числе π там не найдено. Поэтому `Hash16D != PI-PQ`; PI-PQ остаётся отдельной невосстановленной исследовательской линией.
+
+## Physical / hardware backends
+
+- `StreamRadio<T>` добавляет реальный length-prefixed byte-stream transport для UART/USB serial, SDR-daemon socket wrappers, virtual COM и vendor SDK adapters.
+- `HardwareQuantumDriver` + `AttestedHardwareTeleportationBackend<D>` задают границу реального QPU/quantum-network backend.
+- hardware teleportation receipt обязан иметь ненулевой `hardware_attestation_root`; simulation receipt не имеет права содержать hardware attestation.
+
+Подробности: `docs/HASH16D_RECOVERY_PROVENANCE.md` и `docs/HASH16D_CRYPTOANALYSIS.md`.
