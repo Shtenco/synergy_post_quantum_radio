@@ -28,9 +28,9 @@ SimulatedTeleportationBackend всегда имеет режим Simulation. Е�
 
 ## Собственная PI-PQ криптография
 
-Аудит 75 репозиториев обнаружил текущую fail-closed линию в Shtenco/synergy_ai_blockchain/src/pi_pq.rs. Каноническая документация указывает исторический кандидат SYNERGY_ORCH/l1/hash16d.py (~9.4 KB, пять исторических копий), но сам исходник отсутствует в текущем main.
+Аудит 75 репозиториев обнаружил текущую fail-closed линию в Shtenco/synergy_ai_blockchain/src/pi_pq.rs. В R2 оригинальный SYNERGY_ORCH/l1/hash16d.py был восстановлен, но криптоанализ доказал, что он не использует число π и не является PI-PQ.
 
-До восстановления алгоритма PI-PQ не является trust root и не заменяет standards-based PQC.
+R3 forensic pass по GitHub history, Library, старым source bundles, prior project context и Drive не восстановил точный PI-based primitive. Поэтому PI-PQ по-прежнему не является trust root и не заменяет standards-based PQC.
 
 Подробности: docs/PQ_REPOSITORY_AUDIT.md
 
@@ -105,3 +105,32 @@ R2 forensic recovery завершил восстановление оригин�
 - hardware teleportation receipt обязан иметь ненулевой `hardware_attestation_root`; simulation receipt не имеет права содержать hardware attestation.
 
 Подробности: `docs/HASH16D_RECOVERY_PROVENANCE.md` и `docs/HASH16D_CRYPTOANALYSIS.md`.
+
+## R3: Real Hardware Transport + PI-PQ Forensics
+
+Добавлены:
+- `src/wire.rs` — versioned binary wire protocol;
+- SHA-256-bound fragmentation/reassembly для крупных PQ handshake сообщений;
+- `src/node.rs` — полный client/server handshake поверх любого `RadioLink`;
+- тест полного dual-PQ двухузлового обмена при MTU=128 байт;
+- `synergy-pq-radio-serial-node` под feature `serial`;
+- self-synchronizing physical stream frame `SPRS | version | length | SHA-256 | payload`;
+- обязательные реальные `mtu`, `frequency_hz`, `bandwidth_hz` в serial-node;
+- отдельный forensic report `docs/R3_PI_PQ_FORENSICS.md`.
+
+Physical serial example:
+
+```bash
+cargo run --features serial --bin synergy-pq-radio-serial-node -- \
+  server /dev/ttyUSB0 115200 128 915000000 125000
+
+cargo run --features serial --bin synergy-pq-radio-serial-node -- \
+  client /dev/ttyUSB1 115200 128 915000000 125000 "HELLO"
+```
+
+Windows:
+
+```powershell
+cargo run --features serial --bin synergy-pq-radio-serial-node -- server COM5 115200 128 915000000 125000
+cargo run --features serial --bin synergy-pq-radio-serial-node -- client COM6 115200 128 915000000 125000 "HELLO"
+```
