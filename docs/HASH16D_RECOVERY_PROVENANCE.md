@@ -9,7 +9,7 @@ Original container:
 
 Recovered source:
 - bytes: 9,611
-- lines: 249
+- lines: 250 (including final empty line)
 - SHA-256: `f0e57cd160d537e06abecb665b10ad37cd38c8919a1d2f1e336d8f661c80a3a6`
 - default persona: `SINERGY_16D_v3`
 
