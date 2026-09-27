@@ -148,6 +148,7 @@ pub struct AuthenticatedServerHello {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClientFinish {
     pub transcript_root: [u8;32],
+    pub ml_kem_ciphertext_to_server: Vec<u8>,
     pub client_signature: DualPqSignature,
 }
 
@@ -239,20 +240,30 @@ pub fn finish_client(
         &server_shared,
         &client_to_server_shared,
         &client_to_server_ct,
+        SessionRole::Client,
     )?;
 
-    Ok((ClientFinish { transcript_root: finish_root, client_signature }, session))
+    Ok((
+        ClientFinish {
+            transcript_root: finish_root,
+            ml_kem_ciphertext_to_server: client_to_server_ct,
+            client_signature,
+        },
+        session,
+    ))
 }
 
 pub fn finish_server(
     state: &ServerHandshakeState,
     client: &ClientHello,
     finish: &ClientFinish,
-    client_to_server_ciphertext: &[u8],
 ) -> Result<RadioSession, &'static str> {
     let transcript_root=state.authenticated_hello.hello.transcript_root(client)
         .ok_or("invalid transcript")?;
-    let expected_finish_root=client_finish_root(&transcript_root,client_to_server_ciphertext)?;
+    let expected_finish_root=client_finish_root(
+        &transcript_root,
+        &finish.ml_kem_ciphertext_to_server,
+    )?;
     if finish.transcript_root != expected_finish_root {
         return Err("client finish transcript mismatch");
     }
@@ -260,13 +271,16 @@ pub fn finish_server(
         return Err("client dual-PQ signature verification failed");
     }
 
-    let responder_shared=state.kem.decapsulate(client_to_server_ciphertext)?;
+    let responder_shared=state
+        .kem
+        .decapsulate(&finish.ml_kem_ciphertext_to_server)?;
     derive_session(
         client,
         &state.authenticated_hello.hello,
         &state.shared_with_client,
         &responder_shared,
-        client_to_server_ciphertext,
+        &finish.ml_kem_ciphertext_to_server,
+        SessionRole::Server,
     )
 }
 
@@ -280,12 +294,19 @@ fn client_finish_root(transcript_root:&[u8;32], ciphertext:&[u8]) -> Result<[u8;
     Ok(h.finalize().into())
 }
 
+#[derive(Clone, Copy)]
+enum SessionRole {
+    Client,
+    Server,
+}
+
 fn derive_session(
     client:&ClientHello,
     server:&ServerHello,
     secret_a:&SharedSecret,
     secret_b:&SharedSecret,
     client_to_server_ciphertext:&[u8],
+    role: SessionRole,
 )->Result<RadioSession,&'static str>{
     let transcript=server.transcript_root(client).ok_or("invalid transcript")?;
     let finish=client_finish_root(&transcript,client_to_server_ciphertext)?;
@@ -295,17 +316,28 @@ fn derive_session(
     ikm[32..].copy_from_slice(secret_b.as_bytes());
 
     let hk=Hkdf::<Sha256>::new(Some(&finish),&ikm);
-    let mut key=[0u8;SESSION_KEY_BYTES];
-    hk.expand(b"SYNERGY/PQ-RADIO/SESSION-KEY/V1",&mut key)
-        .map_err(|_|"HKDF expand failed")?;
+    let mut client_to_server_key=[0u8;SESSION_KEY_BYTES];
+    let mut server_to_client_key=[0u8;SESSION_KEY_BYTES];
+    hk.expand(b"SYNERGY/PQ-RADIO/CLIENT-TO-SERVER/V1",&mut client_to_server_key)
+        .map_err(|_|"HKDF client-to-server expand failed")?;
+    hk.expand(b"SYNERGY/PQ-RADIO/SERVER-TO-CLIENT/V1",&mut server_to_client_key)
+        .map_err(|_|"HKDF server-to-client expand failed")?;
     ikm.zeroize();
+
+    let (tx_key,rx_key,tx_direction,rx_direction)=match role {
+        SessionRole::Client => (client_to_server_key,server_to_client_key,0x01,0x02),
+        SessionRole::Server => (server_to_client_key,client_to_server_key,0x02,0x01),
+    };
 
     Ok(RadioSession {
         session_id: client.session_id,
         peer_a: client.identity.node_id,
         peer_b: server.identity.node_id,
         transcript_root: finish,
-        key,
+        tx_key,
+        rx_key,
+        tx_direction,
+        rx_direction,
         send_sequence:0,
         receive_sequence:0,
     })
@@ -316,13 +348,19 @@ pub struct RadioSession {
     pub peer_a:[u8;32],
     pub peer_b:[u8;32],
     pub transcript_root:[u8;32],
-    key:[u8;SESSION_KEY_BYTES],
+    tx_key:[u8;SESSION_KEY_BYTES],
+    rx_key:[u8;SESSION_KEY_BYTES],
+    tx_direction:u8,
+    rx_direction:u8,
     send_sequence:u64,
     receive_sequence:u64,
 }
 
 impl Drop for RadioSession {
-    fn drop(&mut self) { self.key.zeroize(); }
+    fn drop(&mut self) {
+        self.tx_key.zeroize();
+        self.rx_key.zeroize();
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -340,9 +378,9 @@ impl RadioSession {
         if aad_root==[0;32] { return Err("AAD root required"); }
 
         let sequence=self.send_sequence;
-        let nonce=nonce_for(self.session_id,sequence,0x01);
+        let nonce=nonce_for(self.session_id,sequence,self.tx_direction);
         let aad=frame_aad(self.session_id,sequence,aad_root);
-        let cipher=ChaCha20Poly1305::new((&self.key).into());
+        let cipher=ChaCha20Poly1305::new((&self.tx_key).into());
         let ciphertext=cipher.encrypt(Nonce::from_slice(&nonce),Payload{msg:plaintext,aad:&aad})
             .map_err(|_|"radio encryption failed")?;
         self.send_sequence+=1;
@@ -353,9 +391,9 @@ impl RadioSession {
         if frame.session_id!=self.session_id { return Err("session mismatch"); }
         if frame.sequence!=self.receive_sequence { return Err("replay or out-of-order frame"); }
         if frame.aad_root==[0;32] { return Err("AAD root required"); }
-        let nonce=nonce_for(self.session_id,frame.sequence,0x01);
+        let nonce=nonce_for(self.session_id,frame.sequence,self.rx_direction);
         let aad=frame_aad(self.session_id,frame.sequence,frame.aad_root);
-        let cipher=ChaCha20Poly1305::new((&self.key).into());
+        let cipher=ChaCha20Poly1305::new((&self.rx_key).into());
         let plaintext=cipher.decrypt(Nonce::from_slice(&nonce),Payload{msg:&frame.ciphertext,aad:&aad})
             .map_err(|_|"radio authentication failed")?;
         self.receive_sequence+=1;
@@ -385,14 +423,18 @@ fn frame_aad(session_id:[u8;32],sequence:u64,aad_root:[u8;32])->Vec<u8>{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::quantum::{QubitState, SimulatedTeleportationBackend, QuantumTeleportationBackend};
+    use crate::quantum::{QubitState, QuantumTeleportationBackend, SimulatedTeleportationBackend};
 
     fn radio()->RadioCapabilities{
-        RadioCapabilities{frequency_hz:915_000_000,bandwidth_hz:125_000,modem:"SIM-LORA".into()}
+        RadioCapabilities{
+            frequency_hz:915_000_000,
+            bandwidth_hz:125_000,
+            modem:"SIM-LORA".into(),
+        }
     }
 
     #[test]
-    fn full_handshake_and_encrypted_frame_roundtrip() {
+    fn full_handshake_and_bidirectional_encrypted_frames_roundtrip() {
         let alice=PqIdentity::generate().expect("alice");
         let bob=PqIdentity::generate().expect("bob");
         let mut q=SimulatedTeleportationBackend::default();
@@ -401,29 +443,39 @@ mod tests {
         let client=start_client(&alice,1,radio(),Some(&tq),None).expect("client");
         let server=accept_server(&bob,&client.hello,radio(),Some(&tq),None).expect("server");
 
-        let transcript=server.authenticated_hello.hello.transcript_root(&client.hello).unwrap();
-        assert!(verify_dual_signature(
-            &server.authenticated_hello.hello.identity,
-            &transcript,
-            &server.authenticated_hello.server_signature
-        ));
-
-        // Build the second KEM leg explicitly so server and client derive the same two-secret combiner.
-        let (c2s_ct,c2s_shared)=encapsulate(&server.authenticated_hello.hello.responder_ephemeral_ml_kem_public_key).unwrap();
-        let s2c_shared=client.kem.decapsulate(&server.authenticated_hello.hello.ml_kem_ciphertext_to_client).unwrap();
-
-        let finish_root=client_finish_root(&transcript,&c2s_ct).unwrap();
-        let finish=ClientFinish{transcript_root:finish_root,client_signature:alice.sign_handshake(&finish_root).unwrap()};
-        assert!(verify_dual_signature(&client.hello.identity,&finish_root,&finish.client_signature));
-
-        let mut client_session=derive_session(&client.hello,&server.authenticated_hello.hello,&s2c_shared,&c2s_shared,&c2s_ct).unwrap();
-        let mut server_session=finish_server(&server,&client.hello,&finish,&c2s_ct).unwrap();
+        let (finish,mut client_session)=finish_client(
+            &alice,
+            &client,
+            &server.authenticated_hello,
+        ).expect("client finish");
+        let mut server_session=finish_server(&server,&client.hello,&finish).expect("server finish");
 
         assert_eq!(client_session.transcript_root,server_session.transcript_root);
+
         let aad=[7u8;32];
         let frame=client_session.encrypt(aad,b"radio payload").unwrap();
         let decoded=server_session.decrypt(&frame).unwrap();
         assert_eq!(decoded,b"radio payload");
+        assert!(server_session.decrypt(&frame).is_err());
+
+        let reply=server_session.encrypt([8u8;32],b"ack").unwrap();
+        let decoded_reply=client_session.decrypt(&reply).unwrap();
+        assert_eq!(decoded_reply,b"ack");
+    }
+
+    #[test]
+    fn tampered_ciphertext_fails_closed() {
+        let alice=PqIdentity::generate().expect("alice");
+        let bob=PqIdentity::generate().expect("bob");
+        let client=start_client(&alice,1,radio(),None,None).expect("client");
+        let server=accept_server(&bob,&client.hello,radio(),None,None).expect("server");
+        let (finish,mut client_session)=finish_client(
+            &alice,&client,&server.authenticated_hello
+        ).expect("client finish");
+        let mut server_session=finish_server(&server,&client.hello,&finish).expect("server finish");
+
+        let mut frame=client_session.encrypt([3u8;32],b"secret").unwrap();
+        frame.ciphertext[0]^=0x01;
         assert!(server_session.decrypt(&frame).is_err());
     }
 }
