@@ -24,6 +24,8 @@ jobs:
         run: cargo check --all-targets
       - name: Test
         run: cargo test --all-targets
+      - name: Serial hardware build
+        run: cargo check --features serial --bin synergy-pq-radio-serial-node
       - name: Hash16D recovered KAT
         run: python tests/hash16d_kat.py
       - name: Demo
