@@ -7,10 +7,12 @@
 //!    exact historical primitive is recovered and independently reviewed.
 
 pub mod crypto;
+pub mod node;
 pub mod pi_pq;
 pub mod protocol;
 pub mod quantum;
 pub mod radio;
+pub mod wire;
 
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const NETWORK_DOMAIN: &[u8] = b"SYNERGY/PQ-RADIO/V1\0";
