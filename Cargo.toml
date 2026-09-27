@@ -1,0 +1,49 @@
+[package]
+name = "synergy-post-quantum-radio"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+description = "Post-quantum authenticated radio protocol with quantum-teleportation evidence binding"
+
+[lib]
+name = "synergy_post_quantum_radio"
+path = "src/lib.rs"
+
+[[bin]]
+name = "synergy-pq-radio-demo"
+path = "src/bin/demo.rs"
+
+[[bin]]
+name = "synergy-pq-radio-serial-node"
+path = "src/bin/serial_node.rs"
+required-features = ["serial"]
+
+[features]
+default = []
+serial = ["dep:serialport"]
+
+[dependencies]
+chacha20poly1305 = "0.10.1"
+fips205 = { version = "0.4.1", default-features = false, features = ["default-rng", "slh_dsa_shake_256s"] }
+hkdf = "0.12.4"
+hex = "0.4.3"
+ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc", "getrandom", "zeroize"] }
+ml-kem = { version = "0.3.2", default-features = false, features = ["getrandom", "zeroize"] }
+num-complex = "0.4.6"
+rand = { version = "0.8.5", features = ["std", "std_rng", "getrandom"] }
+sha2 = "0.10.9"
+serialport = { version = "4", optional = true, default-features = false }
+slh-dsa = { version = "0.1.0", default-features = false, features = ["alloc"] }
+zeroize = { version = "1.8.1", features = ["alloc"] }
+
+[dev-dependencies]
+approx = "0.5.1"
+
+[profile.release]
+overflow-checks = true
+
+[profile.test]
+opt-level = 2
+debug-assertions = true
+overflow-checks = true

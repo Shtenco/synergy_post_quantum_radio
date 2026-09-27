@@ -1,0 +1,32 @@
+name: rust-ci
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.85.0'
+      - name: Format
+        run: cargo fmt --check
+      - name: Check
+        run: cargo check --all-targets
+      - name: Test
+        run: cargo test --all-targets
+      - name: Serial hardware build
+        run: cargo check --features serial --bin synergy-pq-radio-serial-node
+      - name: Hash16D recovered KAT
+        run: python tests/hash16d_kat.py
+      - name: Demo
+        run: cargo run --bin synergy-pq-radio-demo
