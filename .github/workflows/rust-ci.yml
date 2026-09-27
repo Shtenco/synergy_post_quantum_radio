@@ -24,5 +24,7 @@ jobs:
         run: cargo check --all-targets
       - name: Test
         run: cargo test --all-targets
+      - name: Hash16D recovered KAT
+        run: python tests/hash16d_kat.py
       - name: Demo
         run: cargo run --bin synergy-pq-radio-demo
