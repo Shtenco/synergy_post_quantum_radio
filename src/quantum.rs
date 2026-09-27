@@ -93,6 +93,9 @@ pub struct TeleportationReceipt {
     pub source_state_commitment: [u8; 32],
     pub destination_state_commitment: [u8; 32],
     pub fidelity_ppb: u64,
+    /// Nonzero only for a real hardware backend. It commits to device identity,
+    /// calibration, experiment id and the backend's signed/raw evidence bundle.
+    pub hardware_attestation_root: Option<[u8; 32]>,
 }
 
 impl TeleportationReceipt {
@@ -109,6 +112,18 @@ impl TeleportationReceipt {
         if self.fidelity_ppb > 1_000_000_000 {
             return Err("invalid teleportation fidelity");
         }
+        match self.mode {
+            QuantumBackendMode::Simulation => {
+                if self.hardware_attestation_root.is_some() {
+                    return Err("simulation receipt must not carry hardware attestation");
+                }
+            }
+            QuantumBackendMode::Hardware => {
+                if matches!(self.hardware_attestation_root, None | Some([0; 32])) {
+                    return Err("hardware receipt requires nonzero attestation root");
+                }
+            }
+        }
         Ok(())
     }
 
@@ -122,11 +137,13 @@ impl TeleportationReceipt {
         h.update(self.source_state_commitment);
         h.update(self.destination_state_commitment);
         h.update(self.fidelity_ppb.to_be_bytes());
+        h.update(self.hardware_attestation_root.unwrap_or([0; 32]));
         Some(h.finalize().into())
     }
 
     pub fn may_strengthen_physical_security_claim(&self) -> bool {
         self.mode == QuantumBackendMode::Hardware
+            && self.hardware_attestation_root.is_some()
             && self.fidelity_ppb >= MIN_HARDWARE_FIDELITY_PPB
             && self.validate().is_ok()
     }
@@ -135,6 +152,71 @@ impl TeleportationReceipt {
 pub trait QuantumTeleportationBackend {
     fn mode(&self) -> QuantumBackendMode;
     fn teleport(&mut self, source: &QubitState) -> Result<TeleportationReceipt, &'static str>;
+}
+
+
+/// Raw result produced by a physical QPU / quantum-network driver.
+///
+/// The radio protocol does not decide whether an experiment is physically valid.
+/// A hardware integration must provide a nonzero attestation root committing to
+/// device identity, calibration, experiment metadata and raw measurement evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HardwareTeleportationMeasurement {
+    pub bell_pair_id: [u8; 32],
+    pub alice_measurement_q0: u8,
+    pub alice_measurement_q1: u8,
+    pub source_state_commitment: [u8; 32],
+    pub destination_state_commitment: [u8; 32],
+    pub fidelity_ppb: u64,
+    pub hardware_attestation_root: [u8; 32],
+}
+
+pub trait HardwareQuantumDriver {
+    fn teleport_physical(
+        &mut self,
+        source: &QubitState,
+    ) -> Result<HardwareTeleportationMeasurement, &'static str>;
+}
+
+pub struct AttestedHardwareTeleportationBackend<D> {
+    driver: D,
+}
+
+impl<D> AttestedHardwareTeleportationBackend<D> {
+    pub fn new(driver: D) -> Self {
+        Self { driver }
+    }
+
+    pub fn into_inner(self) -> D {
+        self.driver
+    }
+}
+
+impl<D: HardwareQuantumDriver> QuantumTeleportationBackend
+    for AttestedHardwareTeleportationBackend<D>
+{
+    fn mode(&self) -> QuantumBackendMode {
+        QuantumBackendMode::Hardware
+    }
+
+    fn teleport(&mut self, source: &QubitState) -> Result<TeleportationReceipt, &'static str> {
+        let measurement = self.driver.teleport_physical(source)?;
+        if measurement.source_state_commitment != source.commitment() {
+            return Err("hardware result not bound to requested source state");
+        }
+        let receipt = TeleportationReceipt {
+            mode: QuantumBackendMode::Hardware,
+            bell_pair_id: measurement.bell_pair_id,
+            alice_measurement_q0: measurement.alice_measurement_q0,
+            alice_measurement_q1: measurement.alice_measurement_q1,
+            source_state_commitment: measurement.source_state_commitment,
+            destination_state_commitment: measurement.destination_state_commitment,
+            fidelity_ppb: measurement.fidelity_ppb,
+            hardware_attestation_root: Some(measurement.hardware_attestation_root),
+        };
+        receipt.validate()?;
+        Ok(receipt)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -194,6 +276,7 @@ impl SimulatedTeleportationBackend {
             source_state_commitment: source.commitment(),
             destination_state_commitment: bob.commitment(),
             fidelity_ppb,
+            hardware_attestation_root: None,
         };
         receipt.validate()?;
         Ok((bob, receipt))
