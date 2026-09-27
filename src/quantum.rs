@@ -118,11 +118,10 @@ impl TeleportationReceipt {
                     return Err("simulation receipt must not carry hardware attestation");
                 }
             }
-            QuantumBackendMode::Hardware => {
-                if matches!(self.hardware_attestation_root, None | Some([0; 32])) {
-                    return Err("hardware receipt requires nonzero attestation root");
-                }
-            }
+            QuantumBackendMode::Hardware => match self.hardware_attestation_root {
+                Some(root) if root != [0; 32] => {}
+                _ => return Err("hardware receipt requires nonzero attestation root"),
+            },
         }
         Ok(())
     }
