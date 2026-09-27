@@ -50,7 +50,8 @@ impl RadioLink for LoopbackRadio {
 /// std::io::Write: UART/USB serial modems, TCP-connected SDR daemons, virtual
 /// COM ports, or vendor SDK wrappers exposed as a byte stream.
 ///
-/// Framing is deterministic: 4-byte big-endian length followed by payload.
+/// Framing is deterministic and self-synchronizing:
+/// `SPRS | version | u32 length | SHA-256(payload) | payload`.
 /// Cryptographic authentication remains in protocol::EncryptedRadioFrame.
 pub struct StreamRadio<T> {
     io: T,
@@ -90,9 +91,19 @@ impl<T: std::io::Read + std::io::Write> RadioLink for StreamRadio<T> {
             return Err("frame exceeds physical radio MTU");
         }
         let len = u32::try_from(frame.len()).map_err(|_| "frame length overflow")?;
+        let root: [u8; 32] = Sha256::digest(frame).into();
+        self.io
+            .write_all(b"SPRS")
+            .map_err(|_| "physical radio magic write failed")?;
+        self.io
+            .write_all(&[1])
+            .map_err(|_| "physical radio version write failed")?;
         self.io
             .write_all(&len.to_be_bytes())
             .map_err(|_| "physical radio length write failed")?;
+        self.io
+            .write_all(&root)
+            .map_err(|_| "physical radio root write failed")?;
         self.io
             .write_all(frame)
             .map_err(|_| "physical radio payload write failed")?;
@@ -101,6 +112,33 @@ impl<T: std::io::Read + std::io::Write> RadioLink for StreamRadio<T> {
     }
 
     fn receive(&mut self) -> Result<Vec<u8>, &'static str> {
+        let mut sync = [0u8; 4];
+        let mut filled = 0usize;
+        loop {
+            let mut byte = [0u8; 1];
+            self.io
+                .read_exact(&mut byte)
+                .map_err(|_| "physical radio sync read failed")?;
+            if filled < 4 {
+                sync[filled] = byte[0];
+                filled += 1;
+            } else {
+                sync.rotate_left(1);
+                sync[3] = byte[0];
+            }
+            if filled == 4 && &sync == b"SPRS" {
+                break;
+            }
+        }
+
+        let mut version = [0u8; 1];
+        self.io
+            .read_exact(&mut version)
+            .map_err(|_| "physical radio version read failed")?;
+        if version[0] != 1 {
+            return Err("unsupported physical radio stream version");
+        }
+
         let mut len_bytes = [0u8; 4];
         self.io
             .read_exact(&mut len_bytes)
@@ -109,10 +147,19 @@ impl<T: std::io::Read + std::io::Write> RadioLink for StreamRadio<T> {
         if len > self.mtu {
             return Err("received frame exceeds physical radio MTU");
         }
+
+        let mut expected_root = [0u8; 32];
+        self.io
+            .read_exact(&mut expected_root)
+            .map_err(|_| "physical radio root read failed")?;
         let mut frame = vec![0u8; len];
         self.io
             .read_exact(&mut frame)
             .map_err(|_| "physical radio payload read failed")?;
+        let actual_root: [u8; 32] = Sha256::digest(&frame).into();
+        if actual_root != expected_root {
+            return Err("physical radio frame hash mismatch");
+        }
         Ok(frame)
     }
 
