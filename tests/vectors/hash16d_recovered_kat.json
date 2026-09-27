@@ -1,0 +1,29 @@
+{
+  "schema": "SYNERGY/HASH16D-RECOVERED-KAT/V1",
+  "source_sha256": "f0e57cd160d537e06abecb665b10ad37cd38c8919a1d2f1e336d8f661c80a3a6",
+  "source_bytes": 9611,
+  "source_lines": 249,
+  "default_persona": "SINERGY_16D_v3",
+  "vectors": [
+    {
+      "input_hex": "",
+      "fast_hash16d": "bb04cc672ab80bdda85b10d73dce43e60acd960d400aa96c861592eeed0defe2",
+      "full_hash16d": "2399f8eb74bb32f7756f4f0ad769e1aa8b1c34669f8a59f0da050d175a770a2e"
+    },
+    {
+      "input_hex": "616263",
+      "fast_hash16d": "c4c1d3d22c8307595c8148c60ce641b2993141cd1cfb45f0843b4fbb7c56e12a",
+      "full_hash16d": "180bbd389cfb1dc92ce9057665466f6ef06e7bc5bd7eb2a0d63d7a1467d4d3a3"
+    },
+    {
+      "input_hex": "53594e4552475920505120524144494f",
+      "fast_hash16d": "f751352db44e6cf5a024130d1680001a580889797c0e89d2298312464d5e3b68",
+      "full_hash16d": "9fdf475b3f84a17e64b10bc82fc70ba6df297b50145ada09ccb8702c601ad4a6"
+    },
+    {
+      "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "fast_hash16d": "11337cbdfafb5a1dde21bc2586e16561a5396f39053a6869109118a93c3b676a",
+      "full_hash16d": "23d3812bc6c42ec053a0e02758899051e14d2e4f4c8bda34ebc852427f41e33c"
+    }
+  ]
+}
