@@ -67,7 +67,8 @@ pub fn send_encrypted<L: RadioLink>(
     session: &mut RadioSession,
     plaintext: &[u8],
 ) -> Result<(), &'static str> {
-    let frame = session.encrypt(session_aad_root(session), plaintext)?;
+    let aad_root = session_aad_root(session);
+    let frame = session.encrypt(aad_root, plaintext)?;
     send_wire_message(link, &WireMessage::EncryptedFrame(frame))
 }
 
