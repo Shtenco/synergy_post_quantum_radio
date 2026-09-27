@@ -77,21 +77,21 @@ Terminal A:
 
 ```bash
 cargo run --features serial --bin synergy-pq-radio-serial-node -- \
-  server /dev/ttyUSB0 115200
+  server /dev/ttyUSB0 115200 128 915000000 125000
 ```
 
 Terminal B:
 
 ```bash
 cargo run --features serial --bin synergy-pq-radio-serial-node -- \
-  client /dev/ttyUSB1 115200 "HELLO OVER REAL RADIO"
+  client /dev/ttyUSB1 115200 128 915000000 125000 "HELLO OVER REAL RADIO"
 ```
 
 Windows example:
 
 ```powershell
-cargo run --features serial --bin synergy-pq-radio-serial-node -- server COM5 115200
-cargo run --features serial --bin synergy-pq-radio-serial-node -- client COM6 115200 "HELLO"
+cargo run --features serial --bin synergy-pq-radio-serial-node -- server COM5 115200 128 915000000 125000
+cargo run --features serial --bin synergy-pq-radio-serial-node -- client COM6 115200 128 915000000 125000 "HELLO"
 ```
 
 The attached LoRa/FSK/SDR modem must already be configured to expose a reliable
@@ -105,3 +105,22 @@ The code proves a deterministic two-node PQ protocol can traverse a small-MTU by
 It does **not** prove RF propagation until two real modems physically exchange bytes.
 A physical RF GREEN requires captured device identifiers, modem configuration,
 packet counters, transcript root and successful bidirectional payload evidence.
+
+
+## Physical stream recovery
+
+`StreamRadio` no longer trusts a naked length prefix. Each physical frame is:
+
+```text
+SPRS
+version = 1
+payload_length
+SHA-256(payload)
+payload
+```
+
+The receiver scans for `SPRS`, validates the version, bounds the length by configured MTU,
+then verifies SHA-256 before passing the fragment upward. This provides deterministic
+re-synchronization after unrelated bytes or a broken stream boundary. It is an integrity/error
+detection layer only; cryptographic authenticity remains the ML-KEM/ML-DSA/SLH-DSA +
+ChaCha20-Poly1305 protocol above it.
