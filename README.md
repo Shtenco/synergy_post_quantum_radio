@@ -1,12 +1,12 @@
-# 📡 SYNERGY Post-Quantum Radio — verified specification dossier
+#  SYNERGY Post-Quantum Radio — verified specification dossier
 
 > **Домен:** Network / Radio / Post-Quantum Security  
 > **Роль:** спецификация физического UART/LoRa/SDR transport с аутентифицированной постквантовой сессией.  
-> **Статус:** 🧱 **STUB / specification-only** — на проверенном `main` присутствует только `README.md`; executable runtime, tests и evidence artifacts отсутствуют.  
+> **Статус:**  **STUB / specification-only** — на проверенном `main` присутствует только `README.md`; executable runtime, tests и evidence artifacts отсутствуют.  
 > **Проверено по фактическому root tree:** 29.09.2026.  
 > **Архитектурный родитель:** [`synergy_meta_os`](https://github.com/Shtenco/synergy_meta_os)
 
-## 1. 🎯 Проблема и граница проекта
+## 1.  Проблема и граница проекта
 
 Этот repository резервирует отдельную ответственность внутри SYNERGY: спецификация физического UART/LoRa/SDR transport с аутентифицированной постквантовой сессией.
 
@@ -21,7 +21,7 @@ repository name != security/performance proof
 
 Пока в `main` нет кода, strongest honest status — **STUB**.
 
-## 2. 📦 Фактическое состояние `main`
+## 2.  Фактическое состояние `main`
 
 ```text
 synergy_post_quantum_radio/
@@ -39,7 +39,7 @@ synergy_post_quantum_radio/
 
 Это фиксируется как отрицательный, но полезный факт maturity audit.
 
-## 3. 🧠 Целевой design contract
+## 3.  Целевой design contract
 
 Будущая реализация должна иметь явную цепочку:
 
@@ -54,7 +54,7 @@ flowchart LR
 
 Runtime не получает дополнительные полномочия только потому, что находится внутри SYNERGY.
 
-## 4. 📥 Планируемые inputs
+## 4.  Планируемые inputs
 
 - radio frames;
 - peer identity/public keys;
@@ -65,7 +65,7 @@ Runtime не получает дополнительные полномочия 
 
 Каждый input должен иметь version/source/provenance там, где это влияет на воспроизводимость или безопасность.
 
-## 5. 📤 Планируемые outputs
+## 5.  Планируемые outputs
 
 - authenticated encrypted frames;
 - delivery evidence;
@@ -76,7 +76,7 @@ Runtime не получает дополнительные полномочия 
 
 Output становится federation evidence только после schema validation и, при необходимости, cryptographic/content-addressed binding.
 
-## 6. 🛡️ Authority boundaries
+## 6.  Authority boundaries
 
 Обязательное системное правило:
 
@@ -89,7 +89,7 @@ generated artifact != verified artifact
 
 Canonical accounting, settlement, risk, governance, identity или deployment authority остаётся у соответствующего domain owner.
 
-## 7. 🔐 Threat / failure model
+## 7.  Threat / failure model
 
 | Failure mode | Promotion requirement |
 |---|---|
@@ -103,7 +103,7 @@ Canonical accounting, settlement, risk, governance, identity или deployment a
 
 Threat model обязан становиться executable через negative tests, а не оставаться только prose.
 
-## 8. 🧪 Минимальная test matrix
+## 8.  Минимальная test matrix
 
 - [ ] two-node UART loop;
 - [ ] LoRa/SDR packet exchange;
@@ -117,7 +117,7 @@ Threat model обязан становиться executable через negative 
 
 Дополнительно обязательны malformed-input tests, crash/restart behavior и deterministic fixtures для core logic.
 
-## 9. 📊 Evidence model
+## 9.  Evidence model
 
 Strong evidence package будущего runtime должен связывать:
 
@@ -135,7 +135,7 @@ limitations
 
 Без такого bundle README не должен использовать GREEN/E2E wording.
 
-## 10. 🏗️ Place in SYNERGY
+## 10.  Place in SYNERGY
 
 ```mermaid
 flowchart LR
@@ -147,7 +147,7 @@ flowchart LR
 
 Стрелка показывает target architecture, **не runtime dependency**.
 
-## 11. 🛠️ Reproducibility текущего состояния
+## 11.  Reproducibility текущего состояния
 
 Сегодня воспроизводить runtime нечего. Проверяемый факт:
 
@@ -161,20 +161,20 @@ find . -maxdepth 2 -type f
 
 Когда появится runtime, README обязан заменить этот раздел exact build/test commands и dependency versions.
 
-## 12. 🗺️ Current vs required repository map
+## 12.  Current vs required repository map
 
 | Surface | Current | Required for CANDIDATE |
 |---|---:|---:|
-| repository-specific specification | ✅ | ✅ |
-| source/runtime | ❌ | ✅ |
-| typed schema/contract | ❌ | ✅ |
-| unit tests | ❌ | ✅ |
-| negative/security tests | ❌ | ✅ |
-| CI | ❌ | ✅ |
-| evidence artifacts | ❌ | ✅ |
-| reproducible build/run | ❌ | ✅ |
+| repository-specific specification |  |  |
+| source/runtime |  |  |
+| typed schema/contract |  |  |
+| unit tests |  |  |
+| negative/security tests |  |  |
+| CI |  |  |
+| evidence artifacts |  |  |
+| reproducible build/run |  |  |
 
-## 13. ✅ STUB → CANDIDATE promotion gate
+## 13.  STUB → CANDIDATE promotion gate
 
 Promotion is allowed only after all of the following exist:
 
@@ -187,7 +187,7 @@ Promotion is allowed only after all of the following exist:
 7. real repository artifact/evidence;
 8. README updated from target tense to implemented tense only for verified pieces.
 
-## 14. ✅ CANDIDATE → E2E_TESTED gate
+## 14.  CANDIDATE → E2E_TESTED gate
 
 Requires:
 
@@ -201,21 +201,21 @@ Requires:
 
 A local unit test is insufficient.
 
-## 15. 📊 Current evidence maturity
+## 15.  Current evidence maturity
 
 ```text
-Problem/domain definition     ✅
-Architecture specification   ✅
-Inputs/outputs specification ✅
-Threat/failure model          ✅ documented
-Executable implementation    ❌
-Tests                        ❌
-Observed evidence            ❌
-E2E                          ❌
-Production                   ❌
+Problem/domain definition     
+Architecture specification   
+Inputs/outputs specification 
+Threat/failure model           documented
+Executable implementation    
+Tests                        
+Observed evidence            
+E2E                          
+Production                   
 ```
 
-## 16. 🚀 Roadmap
+## 16.  Roadmap
 
 1. formalize v1 typed contract;
 2. implement smallest executable core;
@@ -227,7 +227,7 @@ Production                   ❌
 8. run observed federation gate;
 9. only then upgrade maturity.
 
-## 17. 🛑 Что проект сейчас НЕ утверждает
+## 17.  Что проект сейчас НЕ утверждает
 
 - что runtime существует;
 - что integration уже работает;
@@ -236,10 +236,10 @@ Production                   ❌
 - что roadmap items completed;
 - что STUB может считаться E2E/production.
 
-## 18. 📚 Federation navigation
+## 18.  Federation navigation
 
 - [SYNERGY SYSTEM](https://github.com/Shtenco/synergy_system)
 - [Атлас 75 репозиториев](https://github.com/Shtenco/synergy_system/blob/main/docs/SYNERGY_REPOSITORY_ATLAS.md)
 - [Documentation quality registry](https://github.com/Shtenco/synergy_system/blob/main/registry/DOCUMENTATION_QUALITY.json)
 
-**Итог:** repository теперь имеет подробный предметный specification dossier, но status сознательно остаётся 🧱 STUB до появления кода и evidence.
+**Итог:** repository теперь имеет подробный предметный specification dossier, но status сознательно остаётся  STUB до появления кода и evidence.
