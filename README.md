@@ -1,3 +1,11 @@
+<!-- SCIENTIFIC-V5-2026:START -->
+<img src="assets/readme/scientific-architecture-v5.svg" width="100%" alt="Post-Quantum Radio scientific architecture"/>
+
+**[Научно-техническое досье V5 — постановка, математика, provenance, риски и критерии проверки](docs/SCIENTIFIC_DOSSIER_V5_2026.md)**  
+**Статус документационного аудита:** SPECIFICATION ONLY. Старый README сохранён ниже без удаления исторических материалов.
+
+<!-- SCIENTIFIC-V5-2026:END -->
+
 #  SYNERGY Post-Quantum Radio — verified specification dossier
 
 > **Домен:** Network / Radio / Post-Quantum Security  
